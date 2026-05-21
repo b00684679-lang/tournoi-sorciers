@@ -47,6 +47,7 @@ const SLYT_IMG = "https://toppng.com/uploads/preview/blason-harry-potter-serpent
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const sendTelegram = async (msg) => {
+  if (!msg || !msg.trim()) return;
   try {
     await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
       method: "POST",
@@ -55,6 +56,8 @@ const sendTelegram = async (msg) => {
     });
   } catch {}
 };
+// Prevent duplicate notifications with a simple debounce set
+const _sentNotifs = new Set();
 
 const HOUSES = {
   gryffondor: { name: "Gryffondor", colors: { primary: "#7B0000", secondary: "#C9A84C", accent: "#E8C860", border: "#C9A84C" }, img: GRYF_IMG },
@@ -137,14 +140,18 @@ function App() {
 
   useEffect(() => {
     loadAll();
-    // Realtime subscriptions
-    const ch = sb.channel("tournoi")
-      .on("postgres_changes", { event: "*", schema: "public", table: "history" }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "activities" }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "feed" }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, () => loadAll())
-      .subscribe();
-    return () => sb.removeChannel(ch);
+    // Realtime — délai 2s pour éviter les faux événements au démarrage
+    let ch;
+    const timer = setTimeout(() => {
+      ch = sb.channel("tournoi")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "history" }, () => loadAll())
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "history" }, () => loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "activities" }, () => loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "feed" }, () => loadAll())
+        .on("postgres_changes", { event: "*", schema: "public", table: "participants" }, () => loadAll())
+        .subscribe();
+    }, 2000);
+    return () => { clearTimeout(timer); if (ch) sb.removeChannel(ch); };
   }, []);
 
   const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
