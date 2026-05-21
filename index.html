@@ -37,8 +37,11 @@ const { useState, useEffect, useRef } = React;
 // ═══════════════════════════════════════
 const SUPABASE_URL = "https://xtjndtjrbqyskabtmcez.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ExmxO4mnXHaMeNaa4dUgxA_PQGkzqjD";
-const TG_TOKEN = "8811733600:AAE-81gVFBXK8tbP7xENgyKSYW--zc-8YEc";
-const TG_CHAT_ID = "-5147430955";
+// Token Telegram stocké localement, jamais dans le code
+const getTgConfig = () => ({
+  token: localStorage.getItem("tg_token") || "",
+  chatId: localStorage.getItem("tg_chat_id") || "",
+});
 const ADMIN_PASSWORD = "alohomora";
 
 const GRYF_IMG = "https://logos-marques.com/wp-content/uploads/2022/03/Gryffindor-Logo.jpg";
@@ -48,16 +51,16 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const sendTelegram = async (msg) => {
   if (!msg || !msg.trim()) return;
+  const { token, chatId } = getTgConfig();
+  if (!token || !chatId) return;
   try {
-    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TG_CHAT_ID, text: msg, parse_mode: "HTML" }),
+      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: "HTML" }),
     });
   } catch {}
 };
-// Prevent duplicate notifications with a simple debounce set
-const _sentNotifs = new Set();
 
 const HOUSES = {
   gryffondor: { name: "Gryffondor", colors: { primary: "#7B0000", secondary: "#C9A84C", accent: "#E8C860", border: "#C9A84C" }, img: GRYF_IMG },
@@ -105,6 +108,8 @@ function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPwInput, setAdminPwInput] = useState("");
   const [adminError, setAdminError] = useState(false);
+  const [tgForm, setTgForm] = useState({ token: "", chatId: "" });
+  const [tgSaved, setTgSaved] = useState(() => !!localStorage.getItem("tg_token"));
   const [form, setForm] = useState({ house: "gryffondor", points: "", author: "", reason: "", type: "add" });
   const [postForm, setPostForm] = useState({ author: "", text: "", imgUrl: "" });
   const [activityForm, setActivityForm] = useState({ title: "", description: "", points: "" });
@@ -751,6 +756,46 @@ function App() {
                 + AJOUTER
               </button>
             </div>
+            {/* Telegram config */}
+            <div style={{...cardStyle,border:"1px solid rgba(100,150,200,0.2)",marginBottom:16}}>
+              <p style={{color:"rgba(100,160,220,0.6)",fontSize:10,fontFamily:"'Cinzel',serif",letterSpacing:2,marginBottom:12,textAlign:"center"}}>
+                {tgSaved ? "✦ TELEGRAM CONFIGURÉ ✓" : "CONFIGURER TELEGRAM"}
+              </p>
+              {!tgSaved ? (
+                <div>
+                  <input type="text" placeholder="Token du bot (ex: 8811...)" value={tgForm.token}
+                    onChange={e => setTgForm(f=>({...f,token:e.target.value}))}
+                    style={{...inputStyle,marginBottom:8,fontSize:12}}/>
+                  <input type="text" placeholder="Chat ID du groupe (ex: -5147...)" value={tgForm.chatId}
+                    onChange={e => setTgForm(f=>({...f,chatId:e.target.value}))}
+                    style={{...inputStyle,marginBottom:12,fontSize:12}}/>
+                  <button className="btn" onClick={() => {
+                    if (!tgForm.token.trim() || !tgForm.chatId.trim()) return;
+                    localStorage.setItem("tg_token", tgForm.token.trim());
+                    localStorage.setItem("tg_chat_id", tgForm.chatId.trim());
+                    setTgSaved(true);
+                    setTgForm({token:"",chatId:""});
+                  }} style={{width:"100%",padding:"11px",borderRadius:4,fontSize:11,fontFamily:"'Cinzel',serif",
+                    background:"rgba(20,40,80,0.8)",color:"rgba(100,160,220,0.9)",
+                    border:"1px solid rgba(100,150,200,0.3)",letterSpacing:1}}>
+                    SAUVEGARDER
+                  </button>
+                </div>
+              ) : (
+                <div style={{textAlign:"center"}}>
+                  <p style={{color:"rgba(100,200,100,0.6)",fontSize:13,fontStyle:"italic",marginBottom:10}}>Notifications actives ✓</p>
+                  <button className="btn" onClick={() => {
+                    localStorage.removeItem("tg_token");
+                    localStorage.removeItem("tg_chat_id");
+                    setTgSaved(false);
+                  }} style={{background:"transparent",color:"rgba(180,80,80,0.4)",padding:"8px 16px",
+                    borderRadius:3,fontSize:11,border:"1px solid rgba(180,80,80,0.2)",fontFamily:"'Cinzel',serif"}}>
+                    Réinitialiser
+                  </button>
+                </div>
+              )}
+            </div>
+
             {["gryffondor","serpentard"].map(h => (
               <div key={h} style={{...cardStyle,border:`1px solid ${HOUSES[h].colors.border}22`}}>
                 <p style={{color:HOUSES[h].colors.secondary,fontFamily:"'Cinzel',serif",fontSize:12,letterSpacing:1,marginBottom:12}}>
