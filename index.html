@@ -37,7 +37,7 @@ const { useState, useEffect, useRef } = React;
 // ═══════════════════════════════════════
 const SUPABASE_URL = "https://xtjndtjrbqyskabtmcez.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ExmxO4mnXHaMeNaa4dUgxA_PQGkzqjD";
-const TG_TOKEN = "8811733600:AAETNIcRIiBzcSHBTIxX3OiRNrLGZzcSQwU";
+const TG_TOKEN = "8811733600:AAE-81gVFBXK8tbP7xENgyKSYW--zc-8YEc";
 const TG_CHAT_ID = "-5147430955";
 const ADMIN_PASSWORD = "alohomora";
 
@@ -115,6 +115,7 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   // ── Load data ──
+  const _defaultsInserted = React.useRef(false);
   const loadAll = async () => {
     const [h, a, f, p] = await Promise.all([
       sb.from("history").select("*").order("created_at", { ascending: false }),
@@ -123,8 +124,8 @@ function App() {
       sb.from("participants").select("*"),
     ]);
     if (h.data) setHistory(h.data);
-    if (a.data && a.data.length === 0) {
-      // Insert default activities on first load
+    if (a.data && a.data.length === 0 && !_defaultsInserted.current) {
+      _defaultsInserted.current = true;
       await sb.from("activities").insert(DEFAULT_ACTIVITIES);
       const a2 = await sb.from("activities").select("*").order("created_at", { ascending: true });
       if (a2.data) setActivities(a2.data);
@@ -207,7 +208,8 @@ function App() {
     if (!postForm.author.trim()) return showToast("Ton prénom ?", "error");
     const ts = new Date().toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
     await sb.from("feed").insert({ author: postForm.author.trim(), content: postForm.text.trim(), img_url: postForm.imgUrl.trim(), ts });
-    await sendTelegram(`📸 <b>${postForm.author.trim()}</b> a publié une actu !\n${postForm.text.trim()}`);
+    const postMsg = postForm.text.trim() ? `📸 <b>${postForm.author.trim()}</b> a publié une actu !\n${postForm.text.trim()}` : `📸 <b>${postForm.author.trim()}</b> a partagé une photo !`;
+    await sendTelegram(postMsg);
     setPostForm({ author: "", text: "", imgUrl: "" });
     showToast("Publié !");
   };
